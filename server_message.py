@@ -17,28 +17,34 @@ class ServerMessage:
 
     def send_ok(self) -> None:
         self.__send_message_to_client("SEND-OK")
-        pass
+        print("SEND-OK")
 
     def unknown(self) -> None:
         self.__send_message_to_client("UNKNOWN")
+        print("UNKNOWN")
 
     def delivery(self, username, message) -> None:
         message = " ".join(message)
         self.__send_message_to_client(f"DELIVERY {username} {message}")
+        print(f"DELIVERY {username} {message}")
 
     def in_use(self) -> None:
         self.__send_message_to_client("IN-USE")
+        print("IN-USE")
 
     def busy(self) -> None:
         self.__send_message_to_client("BUSY")
+        print("BUSY")
 
     def who_ok(self, usernames) -> None:
         usernames = ",".join(usernames)
         self.__send_message_to_client("WHO-OK " + usernames)
-        pass
+        print("WHO-OK " + usernames)
 
-    def bad_rqst_hdr(self) -> int:
-        pass
+    def bad_rqst_hdr(self) -> None:
+        self.__send_message_to_client("BAD-RQST-HDR")
+        print("BAD-RQST-HDR")
 
-    def bad_rqst_body(self) -> int:
-        pass
+    def bad_rqst_body(self) -> None:
+        self.__send_message_to_client("BAD-RQST-BODY")
+        print("BAD-RQST-BODY")

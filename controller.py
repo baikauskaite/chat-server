@@ -13,7 +13,7 @@ class Controller:
         self.__initialize_socket(server_address)
         # Clients' socket list
         self.sockets_list = [self.server_socket]
-        # Dictionary of clients, key - socket, value - username
+        # Dictionary of clients: key - socket, value - username
         self.clients = {}
 
     def __initialize_socket(self, server_address) -> None:
@@ -21,7 +21,7 @@ class Controller:
         # Allows us to reconnect
         self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.server_socket.bind(server_address)
-        self.server_socket.listen()
+        self.server_socket.listen(self.MAX_CLIENTS)
 
     def receive_client_message(self, client_socket):
         try:
@@ -35,11 +35,33 @@ class Controller:
             print(e)
             return False
 
+    # Matches the request's heading and performs a function accordingly
     def match_heading(self, client_message):
-        self.headings[client_message.head](self, client_message)
+        heading = client_message.head
+
+        # Checks whether there exists such a heading, if not, "BAD-RQST-HDR" is sent
+        if heading not in self.headings.keys():
+            server_message = ServerMessage(client_message.client_socket)
+            server_message.bad_rqst_hdr()
+            return
+
+        self.headings[heading](self, client_message)
+
+    # Sends a "BAD-RQST-BODY" if the body of the request is empty
+    def is_empty_body(self, client_socket, body) -> bool:
+        if not body:
+            server_message = ServerMessage(client_socket)
+            server_message.bad_rqst_body()
+            return True
+        return False
 
     def hello_from(self, client_message):
         client_socket = client_message.client_socket
+
+        # Check if there's a username in the request body
+        if self.is_empty_body(client_socket, client_message.body):
+            return
+
         username = " ".join(client_message.body)
         server_message = ServerMessage(client_socket)
 
@@ -55,6 +77,12 @@ class Controller:
     def who(self, client_message):
         client_socket = client_message.client_socket
         server_message = ServerMessage(client_socket)
+
+        # There should be no body in "WHO" request
+        if client_message.body:
+            server_message.bad_rqst_body()
+            return
+
         usernames = self.clients.values()
         server_message.who_ok(usernames)
 
@@ -62,7 +90,16 @@ class Controller:
         sender_socket = client_message.client_socket
         server_message_to_sender = ServerMessage(sender_socket)
         sender_username = self.clients[sender_socket]
+
+        # Check if the request body is not empty
+        if self.is_empty_body(sender_socket, client_message.body):
+            return
+
         receiver_username = client_message.body.pop(0)
+
+        # After popping the username from the request body, check if the rest of the body is not empty
+        if self.is_empty_body(sender_socket, client_message.body):
+            return
 
         receiver_socket = None
         is_user_online = False
@@ -87,6 +124,11 @@ class Controller:
         "SEND": send
     }
 
+    # Removes client both from sockets_list and clients dictionary
+    def remove_client(self, client_socket):
+        self.sockets_list.remove(client_socket)
+        del self.clients[client_socket]
+
     def run_server(self):
         while True:
             read_sockets, _, exception_sockets = select.select(self.sockets_list, [], self.sockets_list)
@@ -108,13 +150,11 @@ class Controller:
 
                     if not byte_str:
                         print("Closed connection from " + self.clients[notified_socket])
-                        self.sockets_list.remove(notified_socket)
-                        del self.clients[notified_socket]
+                        self.remove_client(notified_socket)
                         continue
 
                     client_message = ClientMessage(byte_str, notified_socket)
                     self.match_heading(client_message)
 
             for notified_socket in exception_sockets:
-                self.sockets_list.remove(notified_socket)
-                del self.clients[notified_socket]
+                self.remove_client(notified_socket)
