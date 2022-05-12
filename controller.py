@@ -25,15 +25,24 @@ class Controller:
 
     def receive_client_message(self, client_socket):
         try:
-            byte_str = client_socket.recv(self.BUFFER_SIZE)
-            message = byte_str.decode()
-            # Temporary solution
-            if "\n" not in message:
+            byte_str = self.receive_client_message_helper(client_socket)
+            if byte_str == b'':
                 return False
             return byte_str
         except Exception as e:
             print(e)
             return False
+
+    def receive_client_message_helper(self, client_socket) -> bytes:
+        byte_str = b''
+        while True:
+            part = client_socket.recv(self.BUFFER_SIZE)
+            if not part:
+                return b''
+            byte_str += part
+            message = part.decode()
+            if '\n' in message:
+                return byte_str
 
     # Matches the request's heading and performs a function accordingly
     def match_heading(self, client_message):
