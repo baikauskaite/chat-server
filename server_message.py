@@ -11,7 +11,7 @@ class ServerMessage:
 
     # Responds to the first handshake of the user
     def second_handshake(self, username) -> None:
-        self.__send_message_to_client("HELLO " + username)
+        self.__send_message_to_client(f"HELLO {username}")
 
     def send_ok(self) -> int:
         pass
@@ -22,11 +22,11 @@ class ServerMessage:
     def delivery(self) -> int:
         pass
 
-    def in_use(self) -> int:
-        pass
+    def in_use(self) -> None:
+        self.__send_message_to_client("IN-USE")
 
-    def busy(self) -> int:
-        pass
+    def busy(self) -> None:
+        self.__send_message_to_client("BUSY")
 
     def who_ok(self) -> int:
         pass
