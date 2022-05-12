@@ -39,25 +39,46 @@ class Controller:
         self.headings[client_message.head](self, client_message)
 
     def hello_from(self, client_message):
+        client_socket = client_message.client_socket
         username = " ".join(client_message.body)
-        server_message = ServerMessage(client_message.client_socket)
+        server_message = ServerMessage(client_socket)
 
-        if username in self.clients:
+        if username in self.clients.values():
             server_message.in_use()
         elif len(self.clients) == self.MAX_CLIENTS:
             server_message.busy()
         else:
             server_message.second_handshake(username)
-            self.sockets_list.append(client_message.client_socket)
-            self.clients[client_message.client_socket] = username
-            print(f"Accepted new connection from socket: {client_message.client_socket}"
-                  + f"\n Username: {username}")
+            self.sockets_list.append(client_socket)
+            self.clients[client_socket] = username
 
     def who(self, client_message):
-        pass
+        client_socket = client_message.client_socket
+        server_message = ServerMessage(client_socket)
+        usernames = self.clients.values()
+        server_message.who_ok(usernames)
 
     def send(self, client_message):
-        pass
+        sender_socket = client_message.client_socket
+        server_message_to_sender = ServerMessage(sender_socket)
+        sender_username = self.clients[sender_socket]
+        receiver_username = client_message.body.pop(0)
+
+        receiver_socket = None
+        is_user_online = False
+
+        for sock, username in self.clients.items():
+            if username == receiver_username:
+                receiver_socket = sock
+                is_user_online = True
+                break
+
+        if is_user_online:
+            server_message_to_receiver = ServerMessage(receiver_socket)
+            server_message_to_receiver.delivery(sender_username, client_message.body)
+            server_message_to_sender.send_ok()
+        else:
+            server_message_to_sender.unknown()
 
     # Pairs of headings and functions to process the body for the matching heading
     headings = {
