@@ -3,6 +3,7 @@ import select
 from client_message import *
 from server_message import *
 import signal
+import threading
 
 
 class Controller:
@@ -18,6 +19,8 @@ class Controller:
         self.clients = {}
         # self.quit_program is run when program is ended
         signal.signal(signal.SIGINT, self.quit_program)
+        self.lock = threading.Lock()
+        self.notify_select = open("t.txt", "w")
 
     # Initialize the server's socket
     def __initialize_socket(self, server_address) -> None:
@@ -29,36 +32,28 @@ class Controller:
         self.server_socket.listen(self.MAX_CLIENTS)
 
     # Run the whole server logic
-    def run_server(self):
+    def run_server(self) -> None:
         while True:
             # read_sockets - sockets on which we have received some kind of data
             # _ - not handled here, should be sockets that are ready to be written to (for ex., checks if the buffers
             # are not full)
             # exception_sockets - sockets with some exception
-            read_sockets, _, exception_sockets = select.select(self.sockets_list, [], self.sockets_list)
+            read_sockets, _, exception_sockets = select.select(self.sockets_list, [self.notify_select], self.sockets_list)
 
             for notified_socket in read_sockets:
                 # If the socket in which we received data is the server socket, then there's an incoming new connection
                 if notified_socket == self.server_socket:
                     client_socket, client_address = self.server_socket.accept()
                     print(client_socket)
-
-                    byte_str = self.receive_client_message(client_socket)
-                    # TODO: Disconnect the client if he does not perform the first handshake
-                    # TODO: Await only for first-handshakes here, do not accept other kinds of messages
-                    # If the received message is empty, the client disconnected before sending his name
-                    if byte_str == b'':
-                        continue
-
-                    client_message = ClientMessage(byte_str, client_socket)
-                    self.match_heading(client_message)
+                    t = threading.Thread(target=self.helper, args=(client_socket,))
+                    t.start()
                 # If the socket in which we received data is not the server socket, then it is a client that
                 # is already connected
                 else:
                     byte_str = self.receive_client_message(notified_socket)
 
                     # If client message is empty, the client disconnected
-                    if byte_str == b'':
+                    if not byte_str:
                         print("Closed connection from " + self.clients[notified_socket])
                         self.remove_client(notified_socket)
                         continue
@@ -70,8 +65,23 @@ class Controller:
             for notified_socket in exception_sockets:
                 self.remove_client(notified_socket)
 
+    def helper(self, client_socket):
+        client_socket.settimeout(10)
+        byte_str = self.receive_client_message(client_socket)
+
+        # If the received message is empty, the client disconnected before sending his name
+        if not byte_str:
+            return
+
+        client_message = ClientMessage(byte_str, client_socket)
+        # Accept only first-handshakes, disconnect if other kind of message
+        if client_message.head != "HELLO-FROM":
+            client_socket.close()
+        else:
+            self.hello_from(client_message)
+
     # Receive message in bytes from client, return empty byte string if there's no message or exception happens
-    def receive_client_message(self, client_socket):
+    def receive_client_message(self, client_socket) -> bytes:
         try:
             byte_str = self.receive_client_message_helper(client_socket)
             return byte_str
@@ -94,7 +104,7 @@ class Controller:
                 return byte_str
 
     # Match the request's heading and perform a function accordingly
-    def match_heading(self, client_message):
+    def match_heading(self, client_message) -> None:
         heading = client_message.head
 
         # Check whether there exists such a heading, if not, "BAD-RQST-HDR" is sent
@@ -114,7 +124,7 @@ class Controller:
         return False
 
     # Process "HELLO-FROM" request from client
-    def hello_from(self, client_message):
+    def hello_from(self, client_message) -> None:
         client_socket = client_message.client_socket
 
         # Check if there's a username in the request body
@@ -124,6 +134,7 @@ class Controller:
         username = " ".join(client_message.body)
         server_message = ServerMessage(client_socket)
 
+        self.lock.acquire()
         # Check whether the username is already in use
         if username in self.clients.values():
             server_message.in_use()
@@ -135,9 +146,11 @@ class Controller:
             server_message.second_handshake(username)
             self.sockets_list.append(client_socket)
             self.clients[client_socket] = username
+            self.notify_select.write(" ")
+        self.lock.release()
 
     # Process "WHO" request from client
-    def who(self, client_message):
+    def who(self, client_message) -> None:
         client_socket = client_message.client_socket
         server_message = ServerMessage(client_socket)
 
@@ -150,7 +163,7 @@ class Controller:
         server_message.who_ok(usernames)
 
     # Process "SEND" request from client
-    def send(self, client_message):
+    def send(self, client_message) -> None:
         sender_socket = client_message.client_socket
         server_message_to_sender = ServerMessage(sender_socket)
         sender_username = self.clients[sender_socket]
@@ -182,17 +195,17 @@ class Controller:
 
     # Pairs of headings and functions to process the body for the matching heading
     headings = {
-        "HELLO-FROM": hello_from,
         "WHO": who,
         "SEND": send
     }
 
     # Remove client both from sockets_list and clients' dictionary
-    def remove_client(self, client_socket):
+    def remove_client(self, client_socket) -> None:
         self.sockets_list.remove(client_socket)
         del self.clients[client_socket]
 
     # Close the server_socket before the end of the program
-    def quit_program(self, signum, frame):
+    def quit_program(self, signum, frame) -> None:
         self.server_socket.close()
+        self.notify_select.close()
         exit()

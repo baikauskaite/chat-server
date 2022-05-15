@@ -12,8 +12,7 @@ class ServerMessage:
     # Responds to the first handshake of the user
     def second_handshake(self, username) -> None:
         self.__send_message_to_client(f"HELLO {username}")
-        print(f"Accepted new connection from socket: {self.socket}"
-              + f"\n Username: {username}")
+        print(f"Accepted new connection from socket: {self.socket}" + f"\nUsername: {username}")
 
     def send_ok(self) -> None:
         self.__send_message_to_client("SEND-OK")
