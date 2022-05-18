@@ -44,9 +44,9 @@ class Controller:
                 # If the socket in which we received data is the server socket, then there's an incoming new connection
                 if notified_socket == self.server_socket:
                     client_socket, client_address = self.server_socket.accept()
-                    print(client_socket)
-                    t = threading.Thread(target=self.helper, args=(client_socket,))
-                    t.start()
+                    print("New connection from " + str(client_socket))
+                    receive_first_handshake_thread = threading.Thread(target=self.receive_first_handshake, args=(client_socket,))
+                    receive_first_handshake_thread.start()
                 # If the socket in which we received data is not the server socket, then it is a client that
                 # is already connected
                 else:
@@ -65,8 +65,8 @@ class Controller:
             for notified_socket in exception_sockets:
                 self.remove_client(notified_socket)
 
-    def helper(self, client_socket):
-        client_socket.settimeout(10)
+    def receive_first_handshake(self, client_socket):
+        client_socket.settimeout(60)
         byte_str = self.receive_client_message(client_socket)
 
         # If the received message is empty, the client disconnected before sending his name
@@ -85,8 +85,7 @@ class Controller:
         try:
             byte_str = self.receive_client_message_helper(client_socket)
             return byte_str
-        except Exception as e:
-            print(e)
+        except Exception:
             return b''
 
     # Receive client message, ensure the whole message is received no matter the self.BUFFER_SIZE
@@ -95,11 +94,13 @@ class Controller:
         while True:
             part = client_socket.recv(self.BUFFER_SIZE)
 
+            # If the byte string is empty, the client has disconnected
             if not part:
                 return b''
             byte_str += part
             decoded_part = part.decode()
 
+            # Receive message from server until you meet the newline
             if '\n' in decoded_part:
                 return byte_str
 
