@@ -12,7 +12,6 @@ class ServerMessage:
     # Responds to the first handshake of the user
     def second_handshake(self, username) -> None:
         self.__send_message_to_client(f"HELLO {username}")
-        print(f"Completed handshake with user: {username}")
 
     def send_ok(self) -> None:
         self.__send_message_to_client("SEND-OK")

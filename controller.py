@@ -151,6 +151,7 @@ class Controller:
             server_message.second_handshake(username)
             self.sockets_list.append(client_socket)
             self.clients[client_socket] = username
+            print(f"Completed handshake with user: {username}")
             self.notify_select.write(" ")
         self.lock.release()
 
