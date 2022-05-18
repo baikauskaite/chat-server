@@ -1,7 +1,8 @@
 from controller import *
+import os
 
-HOST_NAME = socket.gethostname()
-PORT_NUMBER = 1234
+HOST_NAME = os.environ['HOST']
+PORT_NUMBER = int(os.environ['PORT'])
 server_address = (HOST_NAME, PORT_NUMBER)
 
 controller = Controller(server_address)

@@ -44,7 +44,7 @@ class Controller:
                 # If the socket in which we received data is the server socket, then there's an incoming new connection
                 if notified_socket == self.server_socket:
                     client_socket, client_address = self.server_socket.accept()
-                    print("New connection from " + str(client_socket))
+                    print(client_socket)
                     receive_first_handshake_thread = threading.Thread(target=self.receive_first_handshake, args=(client_socket,))
                     receive_first_handshake_thread.start()
                 # If the socket in which we received data is not the server socket, then it is a client that
@@ -54,7 +54,7 @@ class Controller:
 
                     # If client message is empty, the client disconnected
                     if not byte_str:
-                        print("Closed connection from " + self.clients[notified_socket])
+                        print(f"Closed connection from user: {self.clients[notified_socket]}")
                         self.remove_client(notified_socket)
                         continue
 
@@ -71,6 +71,8 @@ class Controller:
 
         # If the received message is empty, the client disconnected before sending his name
         if not byte_str:
+            print(f"Closed connection before completing handshake: {str(client_socket)}")
+            client_socket.close()
             return
 
         client_message = ClientMessage(byte_str, client_socket)
@@ -139,9 +141,11 @@ class Controller:
         # Check whether the username is already in use
         if username in self.clients.values():
             server_message.in_use()
+            client_socket.close()
         # Check whether number of clients is already self.MAX_CLIENTS
         elif len(self.clients) == self.MAX_CLIENTS:
             server_message.busy()
+            client_socket.close()
         # Send second_handshake and append client's socket and username to the clients' list
         else:
             server_message.second_handshake(username)
@@ -202,6 +206,7 @@ class Controller:
 
     # Remove client both from sockets_list and clients' dictionary
     def remove_client(self, client_socket) -> None:
+        client_socket.close()
         self.sockets_list.remove(client_socket)
         del self.clients[client_socket]
 
