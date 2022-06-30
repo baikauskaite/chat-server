@@ -1,12 +1,10 @@
-import socket
-import select
+from controller import *
+import os
 
-HOST_NAME = "127.0.0.1"
-PORT_NUMBER = 1234
+HOST_NAME = os.environ['HOST']
+PORT_NUMBER = int(os.environ['PORT'])
+server_address = (HOST_NAME, PORT_NUMBER)
 
-server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-
-server_socket.bind((HOST_NAME, PORT_NUMBER))
-
-server_socket.listen()
+controller = Controller(server_address)
+# Run the whole server logic
+controller.run_server()
